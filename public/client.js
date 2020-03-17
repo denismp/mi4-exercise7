@@ -1,8 +1,92 @@
 $(document).ready(function () {
-    const ethereumProvider = ethers.providers.getDefaultProvider('ropsten');
-    const votingContractAddress = "";
-    const votingContractABI = "";
-    const votingContract = "";
+    //const ethereumProvider = ethers.providers.getDefaultProvider('ropsten');
+    const provider = new ethers.providers.EtherscanProvider('ropsten');
+    const votingContractAddress = "0xc9741248cd1f99764516955278d692d1b0701002";
+    const votingContractABI =
+        [
+            {
+                "constant": false,
+                "inputs": [
+                    {
+                        "name": "name",
+                        "type": "string"
+                    }
+                ],
+                "name": "addCandidate",
+                "outputs": [],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "constant": false,
+                "inputs": [
+                    {
+                        "name": "index",
+                        "type": "uint32"
+                    }
+                ],
+                "name": "vote",
+                "outputs": [],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "constant": true,
+                "inputs": [],
+                "name": "candidatesCount",
+                "outputs": [
+                    {
+                        "name": "",
+                        "type": "uint32"
+                    }
+                ],
+                "payable": false,
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "constant": true,
+                "inputs": [
+                    {
+                        "name": "index",
+                        "type": "uint32"
+                    }
+                ],
+                "name": "getCandidate",
+                "outputs": [
+                    {
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "payable": false,
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "constant": true,
+                "inputs": [
+                    {
+                        "name": "index",
+                        "type": "uint32"
+                    }
+                ],
+                "name": "getVotes",
+                "outputs": [
+                    {
+                        "name": "",
+                        "type": "uint32"
+                    }
+                ],
+                "payable": false,
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+    const votingContract = new ethers.Contract(votingContractAddress, votingContractABI, provider);
 
     showView("viewHome");
 
@@ -41,8 +125,8 @@ $(document).ready(function () {
 
     // Attach AJAX "loading" event listener
     $(document).on({
-        ajaxStart: function() { $("#ajaxLoadingBox").fadeIn(200) },
-        ajaxStop: function() { $("#ajaxLoadingBox").fadeOut(200) }
+        ajaxStart: function () { $("#ajaxLoadingBox").fadeIn(200) },
+        ajaxStop: function () { $("#ajaxLoadingBox").fadeOut(200) }
     });
 
     function showInfo(message) {
@@ -80,6 +164,28 @@ $(document).ready(function () {
 
     async function register() {
         //TODO:
+        let username = $('#usernameRegister').val();
+        let walletPassword = $('#passwordRegister').val();
+        try {
+            let wallet = ethers.Wallet.createRandom();
+            let jsonWallet = await wallet.encrypt(walletPassword, {}, showProgressBox);
+            let backendPassword = CryptoJS.HmacSHA256(username, walletPassword).toString();
+            let result = await $.ajax({
+                type: 'POST',
+                url: `/register`,
+                data: JSON.stringify({ username, password: backendPassword, jsonWallet }),
+                contentType: 'application/json'
+            });
+            sessionStorage['username'] = username;
+            sessionStorage['jsonWallet'] = jsonWallet;
+            showView('viewHome');
+            showInfo(`User "${username}" registered successfully.  Please save your mnemonics: <b>${wallet.mnemonic}</b>`);
+        } catch (err) {
+            showError("Cannot register user.", err);
+        }
+        finally {
+            hideProgressProgress();
+        }
     }
 
     async function loadVotingResults() {
