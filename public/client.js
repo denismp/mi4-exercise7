@@ -160,6 +160,24 @@ $(document).ready(function () {
 
     async function login() {
         //TODO:
+        let username = $('#usernameLogin').val();
+        let walletPassword = $('#passwordLogin').val();
+        let backendPassword = CryptoJS.HmacSHA256(username, walletPassword).toString();
+        try {
+            let result = await $.ajax({
+                type: 'POST',
+                url: `/login`,
+                data: JSON.stringify({ username, password: backendPassword }),
+                contentType: 'application/json'
+            });
+            sessionStorage['username'] = username;
+            sessionStorage['jsonWallet'] = result.jsonWallet;
+            showView('viewHome');
+            showInfo(`User "${username}" logged in successfully`);
+        }
+        catch (err) {
+            showError("Cannot login user. ", err);
+        }
     }
 
     async function register() {
@@ -190,14 +208,61 @@ $(document).ready(function () {
 
     async function loadVotingResults() {
         //TODO:
+        try {
+            // Load the condidates from the Ethereum smart contract
+            let candidates = [];
+            let candidatesCount = await votingContract.candidatesCount();
+            for (let index = 0; index < candidatesCount; index++) {
+                let candidate = await votingContract.getCandidate(index);
+                let votes = await votingContract.getVotes(index);
+                candidates.push({ candidate, votes });
+            }
+            // Display the candidates
+            let votingResultsUl = $('#votingResults').empty();
+            for (let index = 0; index < candidatesCount; index++) {
+                let candidate = candidates[index];
+                let li = $('<li>').html(`${candidate.candidate} -> ${candidate.votes} `);
+                if (sessionStorage['username']) {
+                    let button = $(`<input type="button" value="Vote">`);
+                    button.click(function () {
+                        vote(index, candidate.candidate)
+                    });
+                    li.append(button);
+                }
+                li.appendTo(votingResultsUl);
+            }
+        }
+        catch (err) {
+            showError(err);
+        }
     }
 
     async function vote(candidateIndex, candidateName) {
         //TODO:
+        try {
+            let jsonWallet = sessionStorage['jsonWallet'];
+            let walletPassword = prompt("Enter your wallet password:");
+            let wallet = await ethers.Wallet.fromEncryptedWallet(jsonWallet, walletPassword, showProgressBox);
+            let privateKey = wallet.privateKey;
+            const votingContract = new ethers.Contract(
+                votingContractAddress, votingContractABI, new ethers.Wallet(privateKey, provider));
+            let votingResult = await votingContract.vote(candidateIndex);
+            let tranHash = votingResult.hash;
+            showInfo(`Voted successfully for: ${candidateName}. ` +
+                `See the tranaction: <a href="https://ropsten.etherscan.io/tx/${tranHash}" target="_blank">${tranHash}</a>`);
+        }
+        catch (err) {
+            showError(err);
+        }
+        finally {
+            hideProgressProgress();
+        }
     }
 
     function logout() {
         //TODO:
+        sessionStorage.clear();
+        showView('viewHome');
     }
 
 });
